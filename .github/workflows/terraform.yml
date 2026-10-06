@@ -89,6 +89,7 @@ jobs:
         uses: ./.github/actions/terraform-step
         with:
           terraform-version: ${{ env.TERRAFORM_VERSION }}
+          backend: 'false'
           script: |
             terraform fmt -check -recursive
             terraform validate

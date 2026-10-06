@@ -1,4 +1,4 @@
-# Composite action: runs `terraform init` (against the configured Azure backend)
+# Composite action: runs `terraform init` (optionally against the configured Azure backend)
 # and then executes the caller-supplied script.
 #
 # All env vars (BACKEND_*, ARM_*, FABRIC_*, TF_VAR_*) are inherited from the
@@ -9,7 +9,7 @@
 # the Azure DevOps pipeline.
 
 name: 'Terraform step'
-description: 'Sets up Terraform, runs terraform init against the Azure backend, then a caller-supplied script.'
+description: 'Sets up Terraform, runs terraform init, then a caller-supplied script.'
 
 inputs:
   display-name:
@@ -27,6 +27,10 @@ inputs:
     description: 'Terraform version to install.'
     required: false
     default: '1.15.6'
+  backend:
+    description: 'Initialize the Azure state backend; disable for credential-free validation.'
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
@@ -43,10 +47,14 @@ runs:
       run: |
         set -euo pipefail
 
-        terraform init -input=false \
-          -backend-config="resource_group_name=${BACKEND_RESOURCE_GROUP}" \
-          -backend-config="storage_account_name=${BACKEND_STORAGE_ACCOUNT}" \
-          -backend-config="container_name=${BACKEND_CONTAINER}" \
-          -backend-config="key=${BACKEND_KEY}"
+        if [[ "${{ inputs.backend }}" == 'false' ]]; then
+          terraform init -input=false -backend=false
+        else
+          terraform init -input=false \
+            -backend-config="resource_group_name=${BACKEND_RESOURCE_GROUP}" \
+            -backend-config="storage_account_name=${BACKEND_STORAGE_ACCOUNT}" \
+            -backend-config="container_name=${BACKEND_CONTAINER}" \
+            -backend-config="key=${BACKEND_KEY}"
+        fi
 
         ${{ inputs.script }}
