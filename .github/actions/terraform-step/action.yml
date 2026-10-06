@@ -1,0 +1,52 @@
+# Composite action: runs `terraform init` (against the configured Azure backend)
+# and then executes the caller-supplied script.
+#
+# All env vars (BACKEND_*, ARM_*, FABRIC_*, TF_VAR_*) are inherited from the
+# calling workflow's workflow-level `env:` block. This action does NOT
+# re-declare them — that would only couple it to one specific workflow.
+#
+# GitHub Actions equivalent of pipelines/templates/terraform-step.yml from
+# the Azure DevOps pipeline.
+
+name: 'Terraform step'
+description: 'Sets up Terraform, runs terraform init against the Azure backend, then a caller-supplied script.'
+
+inputs:
+  display-name:
+    description: 'Friendly name for the step (maps to Azure DevOps displayName).'
+    required: false
+    default: 'Terraform step'
+  script:
+    description: 'Shell snippet executed after terraform init.'
+    required: true
+  working-directory:
+    description: 'Directory to run terraform in.'
+    required: false
+    default: '.'
+  terraform-version:
+    description: 'Terraform version to install.'
+    required: false
+    default: '1.15.6'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: false
+
+    - name: ${{ inputs.display-name }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+
+        terraform init -input=false \
+          -backend-config="resource_group_name=${BACKEND_RESOURCE_GROUP}" \
+          -backend-config="storage_account_name=${BACKEND_STORAGE_ACCOUNT}" \
+          -backend-config="container_name=${BACKEND_CONTAINER}" \
+          -backend-config="key=${BACKEND_KEY}"
+
+        ${{ inputs.script }}
